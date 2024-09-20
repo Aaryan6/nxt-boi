@@ -1,101 +1,227 @@
-import Image from "next/image";
+"use client";
+
+import { ArrowLeft, ArrowRight, Volume2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { DndProvider, useDrag, useDrop } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+import { TouchBackend } from "react-dnd-touch-backend";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+
+interface AnswerOption {
+  id: string;
+  text: string;
+}
+
+const data = {
+  question: "What is the capital of France?",
+  correctAnswer: "Paris",
+  options: [
+    { id: "1", text: "Paris" },
+    { id: "2", text: "London" },
+    { id: "3", text: "Berlin" },
+    { id: "4", text: "Madrid" },
+  ],
+};
+
+// Custom hook to determine the appropriate backend
+const useBackend = () => {
+  const [backend, setBackend] = useState(() => HTML5Backend);
+
+  useEffect(() => {
+    const checkTouchDevice = () => {
+      return (
+        "ontouchstart" in window ||
+        navigator.maxTouchPoints > 0 ||
+        // @ts-ignore
+        navigator.msMaxTouchPoints > 0
+      );
+    };
+
+    if (checkTouchDevice()) {
+      setBackend(() => TouchBackend);
+    }
+  }, []);
+
+  return backend;
+};
+
+// Wrapper component for DndProvider
+const DndProviderWrapper = ({ children }: { children: React.ReactNode }) => {
+  const backend = useBackend();
+
+  return <DndProvider backend={backend}>{children}</DndProvider>;
+};
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const [droppedAnswer, setDroppedAnswer] = useState<string | null>(null);
+  const [showCorrectAnswer, setShowCorrectAnswer] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+  useEffect(() => {
+    setIsCorrect(null);
+    setDroppedAnswer(null);
+    setShowCorrectAnswer(false);
+  }, []);
+
+  const handleDrop = (item: AnswerOption) => {
+    const correct = item.text === data.correctAnswer;
+    setDroppedAnswer(item.text);
+    setIsCorrect(correct);
+    setShowCorrectAnswer(true);
+  };
+
+  const speakWord = (text: string) => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "en-US";
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  return (
+    <DndProviderWrapper>
+      <Card className="w-full max-w-lg">
+        <CardContent className="w-full p-6">
+          <div className="mb-4 flex w-full items-center justify-between">
+            <span className="text-lg text-gray-600">Question 1 of 10</span>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => speakWord(data.question)}
+              className="rounded-full"
+            >
+              <Volume2 className="h-4 w-4" />
+              <span className="sr-only">Pronounce question</span>
+            </Button>
+          </div>
+          <div className="mb-6 text-center text-2xl font-bold">
+            {data.question}
+          </div>
+          <DropZone
+            onDrop={handleDrop}
+            isCorrect={isCorrect}
+            droppedAnswer={droppedAnswer}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <div className="mt-6 grid grid-cols-2 gap-4">
+            {data.options && data.options.length > 0 ? (
+              data.options.map((option) => (
+                <DraggableAnswer
+                  key={option.id}
+                  id={option.id}
+                  text={option.text}
+                  isCorrect={
+                    showCorrectAnswer && option.text === data.correctAnswer
+                  }
+                />
+              ))
+            ) : (
+              <p>No options available</p>
+            )}
+          </div>
+          <div className="mt-6 flex items-center justify-between">
+            <Button variant="outline" onClick={() => {}} disabled={false}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {}}
+              disabled={!droppedAnswer}
+            >
+              Next
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </DndProviderWrapper>
   );
 }
+
+const DraggableAnswer = ({
+  id,
+  text,
+  isCorrect,
+}: AnswerOption & { isCorrect: boolean }) => {
+  const [{ isDragging }, drag, dragPreview] = useDrag(() => ({
+    type: "answer",
+    item: { id, text },
+    collect: (monitor) => ({
+      isDragging: !!monitor.isDragging(),
+    }),
+  }));
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    drag(ref);
+    dragPreview(ref);
+  }, [drag, dragPreview]);
+
+  return (
+    <div
+      ref={ref}
+      className={`cursor-move rounded-lg p-3 font-medium shadow-sm transition-all ${
+        isDragging ? "scale-105 opacity-50" : "opacity-100"
+      } ${isCorrect ? "bg-green-200" : "border bg-orange-100"}`}
+      aria-label={`Drag answer: ${text}`}
+    >
+      {text}
+    </div>
+  );
+};
+
+const DropZone = ({
+  onDrop,
+  isCorrect,
+  droppedAnswer,
+}: {
+  onDrop: (item: AnswerOption) => void;
+  isCorrect: boolean | null;
+  droppedAnswer: string | null;
+}) => {
+  const [{ isOver }, drop] = useDrop(() => ({
+    accept: "answer",
+    drop: (item: AnswerOption) => onDrop(item),
+    collect: (monitor) => ({
+      isOver: !!monitor.isOver(),
+    }),
+  }));
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    drop(ref);
+  }, [drop]);
+
+  let bgColor = "bg-gray-200";
+  if (isCorrect === true) bgColor = "bg-green-200";
+  if (isCorrect === false) bgColor = "bg-red-200";
+
+  return (
+    <div
+      ref={ref}
+      className={`h-24 w-full ${bgColor} flex flex-col items-center justify-center rounded-lg bg-orange-50 ${
+        isOver
+          ? "border-4 border-orange-200"
+          : "border-4 border-dashed border-orange-200"
+      } transition-all duration-300`}
+      aria-label="Drop answer here"
+    >
+      {droppedAnswer ? (
+        <>
+          <div className="mb-2 text-xl font-bold">{droppedAnswer}</div>
+          <div className="text-sm">
+            {isCorrect === true && "✅ Correct!"}
+            {isCorrect === false && "❌ Incorrect. Try again!"}
+          </div>
+        </>
+      ) : (
+        <p className="text-xl font-bold text-orange-500/50">
+          Drop your answer here
+        </p>
+      )}
+    </div>
+  );
+};
